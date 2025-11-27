@@ -28,7 +28,7 @@ async def start(client, message):
         InlineKeyboardButton(' About', callback_data='about'),
         InlineKeyboardButton(' Help', callback_data='help')
         ],[
-        InlineKeyboardButton(" Join Our Movie Channel !", url='https://t.me/fandub01')
+        InlineKeyboardButton(" Join Our Movie Channel !", url='https://t.me/rs_anime_movie')
         ],[
         InlineKeyboardButton("❤️ Follow My Fc ❤️", url='https://www.facebook.com/share/1ZuEKSuWjK/')
         ]
@@ -70,25 +70,45 @@ async def rename_start(client, message):
 @Client.on_callback_query()
 async def cb_handler(client, query: CallbackQuery):
     data = query.data 
+    
     if data == "start":
         await query.message.edit_text(
             text=f"""👋 Hello User {query.from_user.mention} \n\nI am an Advance file Renamer and file Converter BOT with permanent and custom thumbnail support.\n\nSend me any video or document !""",
             reply_markup=InlineKeyboardMarkup([[
-        InlineKeyboardButton(" Developer ", url='https://t.me/rs_woner')
-        ],[
-        InlineKeyboardButton(' Updates', url='https://t.me/cartoonfunny03'),
-        InlineKeyboardButton(' Support', url='https://t.me/hindianime03')
-        ],[
-        InlineKeyboardButton(' About', callback_data='about'),
-        InlineKeyboardButton(' Help', callback_data='help')
-        ],[
-        InlineKeyboardButton(" Join Our Movie Channel !", url='https://t.me/fandub01')
-        ],[
-        InlineKeyboardButton("❤️ Follow My Fc ❤️", url='https://www.facebook.com/share/1ZuEKSuWjK/')
-        ]
-        ]
-                )
+                InlineKeyboardButton(" Developer ", url='https://t.me/rs_woner')
+                ],[
+                InlineKeyboardButton(' Updates', url='https://t.me/cartoonfunny03'),
+                InlineKeyboardButton(' Support', url='https://t.me/hindianime03')
+                ],[
+                InlineKeyboardButton(' About', callback_data='about'),
+                InlineKeyboardButton(' Help', callback_data='help')
+                ],[
+                InlineKeyboardButton(" Join Our Movie Channel !", url='https://t.me/rs_anime_movie')
+                ],[
+                InlineKeyboardButton("❤️ Follow My Fc ❤️", url='https://www.facebook.com/share/1ZuEKSuWjK/')
+                ]]
             )
+        )
+    
+    elif data == "rename":
+        try:
+            await query.message.delete()
+            # Send ForceReply for new filename
+            await query.message.reply_text(
+                "**Please enter the new file name:**",
+                reply_to_message_id=query.message.reply_to_message.id,
+                reply_markup=ForceReply(True, placeholder="Enter new filename without extension...")
+            )
+        except Exception as e:
+            print(f"Rename error: {e}")
+            await query.message.reply_text("❌ Error occurred. Please try again.")
+    
+    elif data == "cancel":
+        try:
+            await query.message.delete()
+        except:
+            await query.message.reply_text("✅ Cancelled.")
+    
     elif data == "help":
         await query.message.edit_text(
             text=mr.HELP_TXT,
@@ -100,10 +120,11 @@ async def cb_handler(client, query: CallbackQuery):
                ]]
             )
         )
+    
     elif data == "about":
         await query.message.edit_text(
             text=mr.ABOUT_TXT.format(client.mention),
-            disable_web_page_preview = True,
+            disable_web_page_preview=True,
             reply_markup=InlineKeyboardMarkup( [[
                 InlineKeyboardButton(" Join our Fandub anime Channel ", url="https://t.me/fandub01")
                ],[
@@ -112,25 +133,16 @@ async def cb_handler(client, query: CallbackQuery):
                ]]
             )
         )
-    elif data == "dev":
-        await query.message.edit_text(
-            text=mr.DEV_TXT,
-            reply_markup=InlineKeyboardMarkup( [[
-                InlineKeyboardButton(" Join our official dub anime Channel ", url="https://t.me/rsanime04")
-               ],[
-               InlineKeyboardButton(" 𝙲𝙻𝙾𝚂𝙴", callback_data = "close"),
-               InlineKeyboardButton(" 𝙱𝙰𝙲𝙺", callback_data = "start")
-               ]]
-            )
-        )
+    
     elif data == "close":
         try:
             await query.message.delete()
             await query.message.reply_to_message.delete()
         except:
             await query.message.delete()
-
-
-
-
-
+    
+    # Handle upload buttons
+    elif data.startswith("upload_"):
+        file_type = data.split("_")[1]  # document, video, audio
+        await query.answer(f"Preparing to upload as {file_type}...")
+        # This will be handled by cb_data.py
