@@ -1,23 +1,15 @@
-import re, os
+import os
+import re
 
 id_pattern = re.compile(r'^.\d+$') 
 
-API_ID = 25976192
-
-API_HASH = "8ba23141980539b4896e5adbc4ffd2e2"
-
-BOT_TOKEN = "8384469114:AAHtHohk0PYCCjngic6pqWymEQLKkVqCq98"
-
-FORCE_SUB = "CARTOONFUNNY03"
-
-DB_NAME = "ranem_bot" 
-
-DB_URL = "mongodb+srv://RAHAT1132:RAHAT11a@rahat.txn4lkk.mongodb.net/?appName=Rahat"
- 
-FLOOD = 10
-
-START_PIC = "https://ibb.co.com/qLbYJwK9"
-
-ADMIN = [6621572366]
-
-PORT = 8080
+API_ID = int(os.environ.get("API_ID", ""))
+API_HASH = os.environ.get("API_HASH", "")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
+FORCE_SUB = os.environ.get("FORCE_SUB", "")
+DB_NAME = os.environ.get("DB_NAME", "")
+DB_URL = os.environ.get("DB_URL", "")
+FLOOD = int(os.environ.get("FLOOD", "10"))
+START_PIC = os.environ.get("START_PIC", "")
+ADMIN = [int(admin) for admin in os.environ.get("ADMIN", "").split()]
+PORT = int(os.environ.get("PORT", "8080"))
