@@ -12,6 +12,7 @@ import os
 import humanize
 from PIL import Image
 import time
+import asyncio
 
 @Client.on_callback_query(filters.regex('cancel'))
 async def cancel(bot, update):
@@ -23,62 +24,49 @@ async def cancel(bot, update):
 @Client.on_callback_query(filters.regex('rename'))
 async def rename(bot, update):
     user_id = update.message.chat.id
-    date = update.message.date
     await update.message.delete()
     await update.message.reply_text("__𝙿𝚕𝚎𝚊𝚜𝚎 𝙴𝚗𝚝𝚎𝚛 𝙽𝚎𝚠 𝙵𝚒𝚕𝚎𝙽𝚊𝚖𝚎...__",    
-    reply_to_message_id=update.message.reply_to_message.message_id,  
+    reply_to_message_id=update.message.reply_to_message.id,  
     reply_markup=ForceReply(True))
 
 @Client.on_callback_query(filters.regex(r'^upload_'))
-async def doc(bot, update):
-    type = update.data.split("_")[1]
+async def upload_file(bot, update):
+    file_type = update.data.split("_")[1]  # document, video, audio
     
-    # Extract filename from message text
+    # Get the filename from message text
     message_text = update.message.text
     if "File Name :-" in message_text:
-        new_filename = message_text.split("File Name :-")[1].split("\n")[0].strip().replace("`", "")
+        new_name = message_text.split("File Name :-")[1].split("\n")[0].strip().replace("`", "").strip()
     else:
         await update.message.edit("❌ **Error: Could not find filename**")
         return
-        
-    file_path = f"downloads/{new_filename}"
-    file = update.message.reply_to_message
     
-    if not file:
+    # Get the original file message
+    original_message = update.message.reply_to_message
+    if not original_message:
         await update.message.edit("❌ **Error: Original file not found**")
         return
-        
-    ms = await update.message.edit("⚠️__**Please wait...**__\n__Downloading file to my server...__")
-    c_time = time.time()
     
+    ms = await update.message.edit("⚠️__**Please wait...**__\n__Downloading file...__")
+    
+    # Download file
+    c_time = time.time()
     try:
-        path = await bot.download_media(
-            message=file, 
+        file_path = await bot.download_media(
+            message=original_message,
+            file_name=f"downloads/{new_name}",
             progress=progress_for_pyrogram,
-            progress_args=("⚠️__**Please wait...**__\n\n😈 **Download in progress...**", ms, c_time)
+            progress_args=("⚠️__**Downloading...**__", ms, c_time)
         )
     except Exception as e:
-        await ms.edit(f"❌ **Download Error:** {e}")
-        return 
-        
-    if not path:
+        await ms.edit(f"❌ **Download failed:** {e}")
+        return
+    
+    if not file_path:
         await ms.edit("❌ **Failed to download file**")
         return
-        
-    splitpath = path.split("/downloads/")
-    dow_file_name = splitpath[1] if len(splitpath) > 1 else os.path.basename(path)
-    old_file_name = f"downloads/{dow_file_name}"
     
-    # Create downloads directory if not exists
-    os.makedirs("downloads", exist_ok=True)
-    
-    # Rename file
-    try:
-        os.rename(old_file_name, file_path)
-    except Exception as e:
-        await ms.edit(f"❌ **Rename Error:** {e}")
-        return
-        
+    # Get file info
     duration = 0
     try:
         metadata = extractMetadata(createParser(file_path))
@@ -86,90 +74,91 @@ async def doc(bot, update):
             duration = metadata.get('duration').seconds
     except:
         pass
-        
-    user_id = update.message.chat.id 
-    ph_path = None 
-    media = getattr(file, file.media.value)
     
-    # Get caption and thumbnail from database
-    c_caption = await db.get_caption(user_id)
-    c_thumb = await db.get_thumbnail(user_id)
+    # Get user settings from database
+    user_id = update.from_user.id
+    custom_caption = await db.get_caption(user_id)
+    custom_thumb = await db.get_thumbnail(user_id)
     
     # Prepare caption
-    if c_caption:
+    file_size = os.path.getsize(file_path)
+    if custom_caption:
         try:
-            caption = c_caption.format(
-                filename=new_filename, 
-                filesize=humanize.naturalsize(media.file_size), 
+            caption = custom_caption.format(
+                filename=new_name,
+                filesize=humanize.naturalsize(file_size),
                 duration=convert(duration)
             )
-        except Exception as e:
-            caption = f"**{new_filename}**\n\n📦 **Size:** {humanize.naturalsize(media.file_size)}\n⏰ **Duration:** {convert(duration)}"
+        except:
+            caption = f"**{new_name}**\n\n💾 Size: {humanize.naturalsize(file_size)}\n⏰ Duration: {convert(duration)}"
     else:
-        caption = f"**{new_filename}**\n\n📦 **Size:** {humanize.naturalsize(media.file_size)}\n⏰ **Duration:** {convert(duration)}"
+        caption = f"**{new_name}**\n\n💾 Size: {humanize.naturalsize(file_size)}\n⏰ Duration: {convert(duration)}"
     
     # Handle thumbnail
-    if c_thumb:
+    thumb_path = None
+    if custom_thumb:
         try:
-            ph_path = await bot.download_media(c_thumb)
+            thumb_path = await bot.download_media(custom_thumb, file_name=f"thumb_{user_id}.jpg")
         except:
-            ph_path = None
-    elif media.thumbs:
-        try:
-            ph_path = await bot.download_media(media.thumbs[0].file_id)
-        except:
-            ph_path = None
+            thumb_path = None
     
-    # Process thumbnail
-    if ph_path and os.path.exists(ph_path):
+    # Process thumbnail if exists
+    if thumb_path and os.path.exists(thumb_path):
         try:
-            with Image.open(ph_path) as img:
+            with Image.open(thumb_path) as img:
                 img = img.convert("RGB")
                 img.thumbnail((320, 320))
-                img.save(ph_path, "JPEG")
-        except:
-            ph_path = None
+                img.save(thumb_path, "JPEG")
+        except Exception as e:
+            print(f"Thumbnail error: {e}")
+            thumb_path = None
     
+    # Upload file
     await ms.edit("⚠️__**Please wait...**__\n__Uploading file...__")
-    c_time = time.time() 
+    c_time = time.time()
     
     try:
-        if type == "document":
+        if file_type == "document":
             await bot.send_document(
                 chat_id=update.message.chat.id,
                 document=file_path,
-                thumb=ph_path, 
-                caption=caption, 
+                thumb=thumb_path,
+                caption=caption,
                 progress=progress_for_pyrogram,
-                progress_args=("⚠️__**Please wait...**__\n__Uploading file...__", ms, c_time)
+                progress_args=("⚠️__**Uploading...**__", ms, c_time)
             )
-        elif type == "video": 
+        elif file_type == "video":
             await bot.send_video(
                 chat_id=update.message.chat.id,
                 video=file_path,
                 caption=caption,
-                thumb=ph_path,
+                thumb=thumb_path,
                 duration=duration,
                 progress=progress_for_pyrogram,
-                progress_args=("⚠️__**Please wait...**__\n__Uploading file...__", ms, c_time)
+                progress_args=("⚠️__**Uploading...**__", ms, c_time)
             )
-        elif type == "audio": 
+        elif file_type == "audio":
             await bot.send_audio(
                 chat_id=update.message.chat.id,
                 audio=file_path,
                 caption=caption,
-                thumb=ph_path,
+                thumb=thumb_path,
                 duration=duration,
                 progress=progress_for_pyrogram,
-                progress_args=("⚠️__**Please wait...**__\n__Uploading file...__", ms, c_time)
-            ) 
-    except Exception as e: 
-        await ms.edit(f"❌ **Upload Error:** {e}") 
+                progress_args=("⚠️__**Uploading...**__", ms, c_time)
+            )
+        
+        await ms.delete()
+        
+    except Exception as e:
+        await ms.edit(f"❌ **Upload failed:** {e}")
+    
     finally:
         # Cleanup
-        if os.path.exists(file_path):
-            os.remove(file_path)
-        if ph_path and os.path.exists(ph_path):
-            os.remove(ph_path)
-    
-    await ms.delete()
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            if thumb_path and os.path.exists(thumb_path):
+                os.remove(thumb_path)
+        except:
+            pass
