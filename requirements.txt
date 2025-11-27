@@ -1,0 +1,10 @@
+aiofiles
+Pillow
+humanize
+hachoir
+motor
+pyrofork
+TgCrypto
+dnspython
+aiohttp
+pytz
